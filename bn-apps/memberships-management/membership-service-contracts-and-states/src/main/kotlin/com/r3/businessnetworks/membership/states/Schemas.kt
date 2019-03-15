@@ -1,5 +1,6 @@
 package com.r3.businessnetworks.membership.states
 
+import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.Party
 import net.corda.core.schemas.MappedSchema
 import net.corda.core.schemas.PersistentState
@@ -15,6 +16,8 @@ object MembershipStateSchemaV1 : MappedSchema(schemaFamily = MembershipState::cl
     class PersistentMembershipState (
             @Column(name = "member_name")
             var member: Party,
+            @Column(name = "bn_id")
+            var bnId: UniqueIdentifier,
             @Column(name = "bno_name")
             var bno: Party,
             @Column(name = "status")

@@ -41,7 +41,8 @@ open class MembershipContract : Contract {
         const val CONTRACT_NAME = "com.r3.businessnetworks.membership.states.MembershipContract"
     }
 
-    open class Commands : CommandData, TypeOnlyCommandData() {
+    open class Commands : /*CommandData,*/ TypeOnlyCommandData() {
+        class RegisterBNO: Commands()
         class Request : Commands()
         class Amend : Commands()
         class Suspend : Commands()
@@ -55,7 +56,7 @@ open class MembershipContract : Contract {
 
         requireThat {
             "Modified date has to be greater or equal to the issued date" using (outputMembership.modified >= outputMembership.issued)
-            "Both BNO and member have to be participants" using (outputMembership.participants.toSet() == setOf(outputMembership.member, outputMembership.bno))
+            "Both BNO and member have to be participants" using (outputMembership.participants.toSet() == setOf(outputMembership.member, outputMembership.bn.bno))
             "Output state has to be validated with ${contractName()}" using (output.contract == contractName())
             if (!tx.inputs.isEmpty()) {
                 val input = tx.inputs.single()
@@ -87,14 +88,14 @@ open class MembershipContract : Contract {
     }
 
     open fun verifySuspend(tx : LedgerTransaction, command : CommandWithParties<Commands>, outputMembership : MembershipState<*>, inputMembership : MembershipState<*>) {
-        "Only BNO should sign a suspension transaction" using (command.signers.toSet() == setOf(outputMembership.bno.owningKey))
+        "Only BNO should sign a suspension transaction" using (command.signers.toSet() == setOf(outputMembership.bn.bno.owningKey))
         "Input state of a suspension transaction shouldn't be already suspended" using (!inputMembership.isSuspended())
         "Output state of a suspension transaction should be suspended" using (outputMembership.isSuspended())
         "Input and output states of a suspension transaction should have the same metadata" using (inputMembership.membershipMetadata == outputMembership.membershipMetadata)
     }
 
     open fun verifyActivate(tx : LedgerTransaction, command : CommandWithParties<Commands>, outputMembership : MembershipState<*>, inputMembership : MembershipState<*>) {
-        "Only BNO should sign a membership activation transaction" using (command.signers.toSet() == setOf(outputMembership.bno.owningKey))
+        "Only BNO should sign a membership activation transaction" using (command.signers.toSet() == setOf(outputMembership.bn.bno.owningKey))
         "Input state of a membership activation transaction shouldn't be already active" using (!inputMembership.isActive())
         "Output state of a membership activation transaction should be active" using (outputMembership.isActive())
         "Input and output states of a membership activation transaction should have the same metadata" using (inputMembership.membershipMetadata == outputMembership.membershipMetadata)
@@ -119,8 +120,9 @@ open class MembershipContract : Contract {
  * @param status status of the state, i.e. ACTIVE, SUSPENDED, PENDING etc.
  */
 @BelongsToContract(MembershipContract::class)
-data class MembershipState<out T : Any>(val member : Party,
-                                        val bno : Party,
+data class MembershipState<out T : MembershipMetadata>(val member : Party,
+//                                        val bno : Party,
+                                        val bn: BusinessNetwork,
                                         val membershipMetadata : T,
                                         val issued : Instant = Instant.now(),
                                         val modified : Instant = issued,
@@ -130,17 +132,19 @@ data class MembershipState<out T : Any>(val member : Party,
         return when (schema) {
             is MembershipStateSchemaV1 -> MembershipStateSchemaV1.PersistentMembershipState(
                     member = this.member,
-                    bno = this.bno,
+                    bnId = this.bn.id,
+                    bno = this.bn.bno,
                     status = this.status
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")
         }
     }
     override fun supportedSchemas() = listOf(MembershipStateSchemaV1)
-    override val participants = listOf(bno, member)
+    override val participants = setOf(bn.bno, member).toList() //if (bn.bno == member) listOf(member) else listOf(bn.bno, member)
     fun isSuspended() = status == MembershipStatus.SUSPENDED
     fun isPending() = status == MembershipStatus.PENDING
     fun isActive() = status == MembershipStatus.ACTIVE
+    val isBNO = member == bn.bno
 }
 
 /**
@@ -160,3 +164,89 @@ enum class MembershipStatus {
  */
 @CordaSerializable
 data class SimpleMembershipMetadata(val role : String = "", val displayedName : String = "")
+
+/*
+/**
+ * This is an example of interface-based enum class.
+ * MyRole supplements BaseRole.
+ * One problem is name in enum cannot be overriden.
+ * Hence roleName.
+ */
+@CordaSerializable
+interface Role1 {
+    val roleName: String
+    val description: String
+}
+@CordaSerializable
+enum class BaseRole1(override val roleName: String, override val description: String) : Role1 {
+    BNO(roleName = "BNO", description = "Business Network Operator")
+}
+@CordaSerializable
+enum class MyRole1(override val roleName: String, override val description: String) : Role1 {
+    NB(roleName = "NB", description = "New Bank"),
+    OB(roleName = "OB", description = "Old Bank"),
+    SA(roleName = "SA", description = "Service Agent")
+}
+*/
+
+/**
+ * This base and BN specific example pair are object-declaration based.
+ * There are overrides for equals, hashCode, toString so use the default object's.
+ */
+
+@CordaSerializable
+interface Role {
+    val name: String
+    val description: String
+}
+
+@CordaSerializable
+data class RoleDelegate(override val name: String, override val description: String) : Role
+
+/**
+ * Base role definition with the required BNO role.
+ * We use object declaration to simulate enum class element which is also a singleton
+ * There is an example of how to extend it for a BN
+ */
+@CordaSerializable
+object BaseRole {
+    object BNO: Role by RoleDelegate(name = "BNO", description = "Business Network Operator")
+    /** example: equivalent object declaration without using delegate */
+//    object BNO: Role { override val name = "BNO", override val description = "Business Network Operator" }
+}
+
+/*
+/** An BN-specific customization */
+@CordaSerializable
+object MyRole {
+//    object BNO: Role by BaseRole.BNO
+    object NB: Role by RoleDelegate(name = "NB", description = "New Bank")
+    object OB: Role by RoleDelegate(name = "OB", description = "Old Bank")
+    object SA: Role by RoleDelegate(name = "SA", description = "Service Agent")
+}
+*/
+
+/**
+ * Base membership metadata which must include roles.
+ * There is an example of how to extend it for a BN.
+ */
+@CordaSerializable
+open class MembershipMetadata(open val roles: Set<Role>)
+
+/**
+ * This is an example to customize/extend metadata for a CorDapp
+ */
+/*
+data class MyMembershipMetadata(override val roles: Set<Role>): MembershipMetadata(roles) {
+    val displayedName : String = ""
+}
+*/
+
+@CordaSerializable
+data class BusinessNetwork(val id: UniqueIdentifier, val bno: Party) {
+    override fun equals(other: Any?) = (other as? BusinessNetwork)?.let {
+        this.id == other.id
+    } ?: false
+
+    val displayedName: String = id.externalId ?: bno.toString()
+}
