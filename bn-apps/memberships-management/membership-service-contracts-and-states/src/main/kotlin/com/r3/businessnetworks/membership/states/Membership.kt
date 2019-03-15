@@ -53,11 +53,16 @@ open class MembershipContract : Contract {
         val command = tx.commands.requireSingleCommand<Commands>()
         val output = tx.outputs.single { it.data is MembershipState<*> }
         val outputMembership = output.data as MembershipState<*>
+        val bnoRefMembershipState = tx.referenceInputRefsOfType<MembershipState<*>>().singleOrNull()
 
         requireThat {
             "Modified date has to be greater or equal to the issued date" using (outputMembership.modified >= outputMembership.issued)
             "Both BNO and member have to be participants" using (outputMembership.participants.toSet() == setOf(outputMembership.member, outputMembership.bn.bno))
             "Output state has to be validated with ${contractName()}" using (output.contract == contractName())
+            if (command.value !is Commands.RegisterBNO) {
+                "All transactions except for BNO registration should contain the BNO MemberState as reference" using (bnoRefMembershipState != null && bnoRefMembershipState.state.data.isBNO)
+                "All transactions except for BNO registration should contain a non-BNO output state" using (!outputMembership.isBNO)
+            }
             if (!tx.inputs.isEmpty()) {
                 val input = tx.inputs.single()
                 val inputState = input.state.data as MembershipState<*>
@@ -70,6 +75,7 @@ open class MembershipContract : Contract {
         }
 
         when (command.value) {
+            is Commands.RegisterBNO -> verifyRegisterBNO(tx, command, outputMembership)
             is Commands.Request -> verifyRequest(tx, command, outputMembership)
             is Commands.Suspend -> verifySuspend(tx, command, outputMembership, tx.inputsOfType<MembershipState<*>>().single())
             is Commands.Activate -> verifyActivate(tx, command, outputMembership, tx.inputsOfType<MembershipState<*>>().single())
@@ -81,12 +87,17 @@ open class MembershipContract : Contract {
     // custom implementations should be able to specify their own contract names
     open fun contractName() = CONTRACT_NAME
 
+    fun verifyRegisterBNO(tx: LedgerTransaction, command: CommandWithParties<Commands>, outputMembership: MembershipState<*>) = requireThat {
+        "Registering member should be BNO" using (outputMembership.isBNO)
+        "Only BNO should sign a BNO registration transaction" using (command.signers.toSet() == setOf(outputMembership.bn.bno))
+        "BNO registration transaction shouldn't contain any input" using (tx.inputs.isEmpty())
+        "BNO registration transaction should contain an output state in ACTIVE status" using (outputMembership.isActive())
+    }
     open fun verifyRequest(tx : LedgerTransaction, command : CommandWithParties<Commands>, outputMembership : MembershipState<*>) = requireThat {
         "Both BNO and member have to sign a membership request transaction" using (command.signers.toSet() == outputMembership.participants.map { it.owningKey }.toSet() )
         "Membership request transaction shouldn't contain any inputs" using (tx.inputs.isEmpty())
         "Membership request transaction should contain an output state in PENDING status" using (outputMembership.isPending())
     }
-
     open fun verifySuspend(tx : LedgerTransaction, command : CommandWithParties<Commands>, outputMembership : MembershipState<*>, inputMembership : MembershipState<*>) {
         "Only BNO should sign a suspension transaction" using (command.signers.toSet() == setOf(outputMembership.bn.bno.owningKey))
         "Input state of a suspension transaction shouldn't be already suspended" using (!inputMembership.isSuspended())
@@ -120,7 +131,7 @@ open class MembershipContract : Contract {
  * @param status status of the state, i.e. ACTIVE, SUSPENDED, PENDING etc.
  */
 @BelongsToContract(MembershipContract::class)
-data class MembershipState<out T : MembershipMetadata>(val member : Party,
+data class MembershipState<out T : Any>(val member : Party,
 //                                        val bno : Party,
                                         val bn: BusinessNetwork,
                                         val membershipMetadata : T,

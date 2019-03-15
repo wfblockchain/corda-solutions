@@ -10,6 +10,7 @@ import net.corda.testing.node.MockServices
 import net.corda.testing.node.ledger
 import org.junit.Test
 import java.time.Instant
+import java.util.*
 
 class MembershipContractTest {
     private var ledgerServices = MockServices(listOf("com.r3.businessnetworks.membership.states"))
@@ -19,10 +20,14 @@ class MembershipContractTest {
     private val memberParty = member.party
     private val anotherMemberParty = anotherMember.party
     private val bnoParty = bno.party
+    private val bnId = UniqueIdentifier("Aurum BN", UUID.fromString("7ebcc7ca-1e5b-4631-855e-a2f5b7096cd5"))
+    private val bn = BusinessNetwork(bnId, bnoParty)
 
-    private fun membershipState(status : MembershipStatus = MembershipStatus.PENDING, member : Party = memberParty, bno : Party = bnoParty, issued : Instant = Instant.now())
-            = MembershipState(member, bno, issued = issued, status = status, membershipMetadata = SimpleMembershipMetadata("test"))
-
+//    private fun membershipState(status : MembershipStatus = MembershipStatus.PENDING, member : Party = memberParty, bno : Party = bnoParty, issued : Instant = Instant.now())
+//            = MembershipState(member, bno, issued = issued, status = status, membershipMetadata = SimpleMembershipMetadata("test"))
+    private fun membershipState(status : MembershipStatus = MembershipStatus.PENDING, member : Party = memberParty, bn : BusinessNetwork = this.bn, issued : Instant = Instant.now())
+            = MembershipState(member, bn, issued = issued, status = status, membershipMetadata = SimpleMembershipMetadata("test"))
+    private val bnMemberState = membershipState(MembershipStatus.ACTIVE, bnoParty, bn)
 
     @Test
     fun `test common assertions`() {
