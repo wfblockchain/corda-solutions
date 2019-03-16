@@ -31,7 +31,7 @@ open class NotifyMembersFlowResponder(val session : FlowSession) : FlowLogic<Any
                 val membership = notification.changedMembership.state.data
                 // if our membership was suspended - then cleaning up the cache as suspended members won't get notifications anymore
                 if (membership.member == ourIdentity && membership.isSuspended()) {
-                    cache.reset(membership.bno)
+                    cache.reset(membership.bn.bno)
                 } else {
                     cache.updateMembership(notification.changedMembership)
                 }

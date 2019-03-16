@@ -53,7 +53,7 @@ open class RequestMembershipFlow(bno : Party, private val membershipMetadata : A
                 val output = stx.tx.outputs.single()
 
                 val membershipState = output.data as MembershipState<*>
-                if (bno != membershipState.bno) {
+                if (bno != membershipState.bn.bno) {
                     throw IllegalArgumentException("Wrong BNO identity")
                 }
                 if (ourIdentity != membershipState.member) {

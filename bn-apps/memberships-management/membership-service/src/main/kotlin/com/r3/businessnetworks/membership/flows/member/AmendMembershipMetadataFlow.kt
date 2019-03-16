@@ -39,8 +39,8 @@ open class AmendMembershipMetadataFlow(bno : Party, private val newMetadata : An
                     throw FlowException("Invalid membership state. Wrong member's identity ${newMembershipState.member}.")
                 }
 
-                if (newMembershipState.bno != bno) {
-                    throw FlowException("Invalid membership state. Wrong BNO's identity ${newMembershipState.bno}.")
+                if (newMembershipState.bn.bno != bno) {
+                    throw FlowException("Invalid membership state. Wrong BNO's identity ${newMembershipState.bn.bno}.")
                 }
 
                 stx.toLedgerTransaction(serviceHub, false).verify()

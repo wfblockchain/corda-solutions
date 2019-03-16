@@ -5,7 +5,7 @@ apply plugin: 'net.corda.plugins.quasar-utils'
 
 cordapp {
     targetPlatformVersion 4
-    minimumPlatformVersion 1
+    minimumPlatformVersion 4
     workflow {
         name "business-network-membership-service"
         vendor "com.r3"

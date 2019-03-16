@@ -5,6 +5,8 @@ import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
 import net.corda.core.transactions.LedgerTransaction
+import net.corda.core.utilities.seconds
+import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.core.TestIdentity
 import net.corda.testing.node.MockServices
 import net.corda.testing.node.ledger
@@ -13,7 +15,6 @@ import java.time.Instant
 import java.util.*
 
 class MembershipContractTest {
-    private var ledgerServices = MockServices(listOf("com.r3.businessnetworks.membership.states"))
     private val member = TestIdentity(CordaX500Name.parse("O=Member,L=London,C=GB"))
     private val anotherMember = TestIdentity(CordaX500Name.parse("O=Another Member,L=New York,C=US"))
     private val bno = TestIdentity(CordaX500Name.parse("O=BNO,L=London,C=GB"))
@@ -27,7 +28,15 @@ class MembershipContractTest {
 //            = MembershipState(member, bno, issued = issued, status = status, membershipMetadata = SimpleMembershipMetadata("test"))
     private fun membershipState(status : MembershipStatus = MembershipStatus.PENDING, member : Party = memberParty, bn : BusinessNetwork = this.bn, issued : Instant = Instant.now())
             = MembershipState(member, bn, issued = issued, status = status, membershipMetadata = SimpleMembershipMetadata("test"))
-    private val bnMemberState = membershipState(MembershipStatus.ACTIVE, bnoParty, bn)
+    private val bnoMemberState = membershipState(MembershipStatus.ACTIVE, bnoParty, bn)
+
+    private var ledgerServices = MockServices(
+            cordappPackages = listOf("com.r3.businessnetworks.membership.states"),
+            firstIdentity = bno,
+            networkParameters = testNetworkParameters(
+                    minimumPlatformVersion = 4
+            )
+    )
 
     @Test
     fun `test common assertions`() {
@@ -87,20 +96,78 @@ class MembershipContractTest {
     }
 
     @Test
+    fun `test common assertions related to BNO`() {
+        ledgerServices.ledger {
+            val output = membershipState()
+            transaction {
+                output(MembershipContract.CONTRACT_NAME,  output)
+                command(listOf(member.publicKey, bno.publicKey), MembershipContract.Commands.Request())
+                this.`fails with`("All transactions except for BNO registration should contain the active BNO MemberState as reference")
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
+                verifies()
+            }
+            transaction {
+                output(MembershipContract.CONTRACT_NAME,  bnoMemberState)
+                command(listOf(bno.publicKey), MembershipContract.Commands.Request())
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
+                this.`fails with`("All transactions except for BNO registration should contain a non-BNO output state")
+            }
+        }
+    }
+
+    @Test
+    fun `test register BNO`() {
+        ledgerServices.ledger {
+            transaction {
+                val output = bnoMemberState.copy(member = memberParty)
+                output(MembershipContract.CONTRACT_NAME, output)
+                command(listOf(bno.publicKey), MembershipContract.Commands.RegisterBNO())
+                this.`fails with`("Registering member should be BNO")
+            }
+            transaction {
+                output(MembershipContract.CONTRACT_NAME, bnoMemberState)
+                command(listOf(member.publicKey), MembershipContract.Commands.RegisterBNO())
+                this.`fails with`("Only BNO should sign a BNO registration transaction")
+            }
+            transaction {
+                val input = bnoMemberState.copy(modified = bnoMemberState.issued.minusMillis(2))
+                input(MembershipContract.CONTRACT_NAME, input)
+                output(MembershipContract.CONTRACT_NAME, bnoMemberState)
+                command(listOf(bno.publicKey), MembershipContract.Commands.RegisterBNO())
+                this.`fails with`("BNO registration transaction shouldn't contain any input")
+            }
+            transaction {
+                val output = bnoMemberState.copy(status = MembershipStatus.PENDING)
+                output(MembershipContract.CONTRACT_NAME, output)
+                command(listOf(bno.publicKey), MembershipContract.Commands.RegisterBNO())
+                this.`fails with`("BNO registration transaction should contain an output state in ACTIVE status")
+            }
+            transaction {
+                output(MembershipContract.CONTRACT_NAME, bnoMemberState)
+                command(listOf(bno.publicKey), MembershipContract.Commands.RegisterBNO())
+                verifies()
+            }
+        }
+    }
+
+    @Test
     fun `test request membership`() {
         ledgerServices.ledger {
             transaction {
                 output(MembershipContract.CONTRACT_NAME,  membershipState())
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(member.publicKey, bno.publicKey), MembershipContract.Commands.Request())
                 this.verifies()
             }
             transaction {
                 output(MembershipContract.CONTRACT_NAME,  membershipState())
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(member.publicKey), MembershipContract.Commands.Request())
                 this.`fails with`("Both BNO and member have to sign a membership request transaction")
             }
             transaction {
                 output(MembershipContract.CONTRACT_NAME,  membershipState(MembershipStatus.SUSPENDED))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(member.publicKey, bno.publicKey), MembershipContract.Commands.Request())
                 this.`fails with`("Membership request transaction should contain an output state in PENDING status")
             }
@@ -108,6 +175,7 @@ class MembershipContractTest {
                 val state  = membershipState()
                 input(MembershipContract.CONTRACT_NAME,  state)
                 output(MembershipContract.CONTRACT_NAME,  state.copy(modified = state.modified.plusSeconds(10)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(member.publicKey, bno.publicKey), MembershipContract.Commands.Request())
                 this.`fails with`("Membership request transaction shouldn't contain any inputs")
             }
@@ -121,6 +189,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.ACTIVE)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.SUSPENDED, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Suspend())
                 this.verifies()
             }
@@ -128,6 +197,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.ACTIVE)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.SUSPENDED, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Suspend())
                 this.`fails with`("Only BNO should sign a suspension transaction")
             }
@@ -135,6 +205,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.SUSPENDED)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.SUSPENDED, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Suspend())
                 this.`fails with`("Input state of a suspension transaction shouldn't be already suspended")
             }
@@ -142,6 +213,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.ACTIVE)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.PENDING, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Suspend())
                 this.`fails with`( "Output state of a suspension transaction should be suspended")
             }
@@ -149,6 +221,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.ACTIVE)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.SUSPENDED, modified = input.modified.plusMillis(1), membershipMetadata = SimpleMembershipMetadata(role = "Another role")))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Suspend())
                 this.`fails with`("Input and output states of a suspension transaction should have the same metadata")
             }
@@ -162,6 +235,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.SUSPENDED)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.ACTIVE, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Activate())
                 this.verifies()
             }
@@ -169,6 +243,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.SUSPENDED)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.ACTIVE, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Activate())
                 this.`fails with`("Only BNO should sign a membership activation transaction")
             }
@@ -176,6 +251,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.ACTIVE)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.ACTIVE, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Activate())
                 this.`fails with`("Input state of a membership activation transaction shouldn't be already active")
             }
@@ -183,6 +259,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.SUSPENDED)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.PENDING, modified = input.modified.plusMillis(1)))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Activate())
                 this.`fails with`("Output state of a membership activation transaction should be active")
             }
@@ -190,6 +267,7 @@ class MembershipContractTest {
                 val input = membershipState(MembershipStatus.SUSPENDED)
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.ACTIVE, modified = input.modified.plusMillis(1), membershipMetadata = SimpleMembershipMetadata(role = "Another metadata")))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Activate())
                 this.`fails with`("Input and output states of a membership activation transaction should have the same metadata")
             }
@@ -198,37 +276,42 @@ class MembershipContractTest {
 
 
     @Test
-    fun `test amend member's metadata`() {
+    fun `test amend member metadata`() {
         val input = membershipState(MembershipStatus.ACTIVE)
         val output = input.copy(status = MembershipStatus.ACTIVE, modified = input.modified.plusMillis(1), membershipMetadata = SimpleMembershipMetadata(role = "New metadata"))
         ledgerServices.ledger {
             transaction {
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  output)
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Amend())
                 this.verifies()
             }
             transaction {
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  output)
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey), MembershipContract.Commands.Amend())
                 this.`fails with`("Both BNO and member have to sign a metadata amendment transaction")
             }
             transaction {
                 input(MembershipContract.CONTRACT_NAME,  input.copy(status = MembershipStatus.PENDING))
                 output(MembershipContract.CONTRACT_NAME,  output)
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Amend())
                 this.`fails with`("Both input and output states of a metadata amendment transaction should be active")
             }
             transaction {
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  output.copy(status = MembershipStatus.PENDING))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Amend())
                 this.`fails with`("Both input and output states of a metadata amendment transaction should be active")
             }
             transaction {
                 input(MembershipContract.CONTRACT_NAME,  input)
                 output(MembershipContract.CONTRACT_NAME,  output.copy(membershipMetadata = input.membershipMetadata))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Amend())
                 this.`fails with`("Input and output states of an amendment transaction should have different membership metadata")
             }
@@ -236,6 +319,7 @@ class MembershipContractTest {
                 input(MembershipContract.CONTRACT_NAME,  input)
                 // changing metadata to an object of a different type
                 output(MembershipContract.CONTRACT_NAME,  (output as MembershipState<Any>).copy(membershipMetadata = 1))
+                reference(MembershipContract.CONTRACT_NAME, bnoMemberState)
                 command(listOf(bno.publicKey, member.publicKey), MembershipContract.Commands.Amend())
                 this.`fails with`("Input and output states's metadata of an amendment transaction should be of the same type")
             }

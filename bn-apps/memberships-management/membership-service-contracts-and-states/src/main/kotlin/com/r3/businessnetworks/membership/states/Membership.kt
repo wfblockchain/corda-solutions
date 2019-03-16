@@ -59,10 +59,6 @@ open class MembershipContract : Contract {
             "Modified date has to be greater or equal to the issued date" using (outputMembership.modified >= outputMembership.issued)
             "Both BNO and member have to be participants" using (outputMembership.participants.toSet() == setOf(outputMembership.member, outputMembership.bn.bno))
             "Output state has to be validated with ${contractName()}" using (output.contract == contractName())
-            if (command.value !is Commands.RegisterBNO) {
-                "All transactions except for BNO registration should contain the BNO MemberState as reference" using (bnoRefMembershipState != null && bnoRefMembershipState.state.data.isBNO)
-                "All transactions except for BNO registration should contain a non-BNO output state" using (!outputMembership.isBNO)
-            }
             if (!tx.inputs.isEmpty()) {
                 val input = tx.inputs.single()
                 val inputState = input.state.data as MembershipState<*>
@@ -71,6 +67,10 @@ open class MembershipContract : Contract {
                 "Input and output states should have the same issued dates" using (inputState.issued == outputMembership.issued)
                 "Input and output states should have the same linear IDs" using (inputState.linearId == outputMembership.linearId)
                 "Output state's modified timestamp should be greater than input's" using (outputMembership.modified > inputState.modified)
+            }
+            if (command.value !is Commands.RegisterBNO) {
+                "All transactions except for BNO registration should contain the active BNO MemberState as reference" using (bnoRefMembershipState != null && bnoRefMembershipState.state.data.isBNO && bnoRefMembershipState.state.data.isActive())
+                "All transactions except for BNO registration should contain a non-BNO output state" using (!outputMembership.isBNO)
             }
         }
 
@@ -89,7 +89,7 @@ open class MembershipContract : Contract {
 
     fun verifyRegisterBNO(tx: LedgerTransaction, command: CommandWithParties<Commands>, outputMembership: MembershipState<*>) = requireThat {
         "Registering member should be BNO" using (outputMembership.isBNO)
-        "Only BNO should sign a BNO registration transaction" using (command.signers.toSet() == setOf(outputMembership.bn.bno))
+        "Only BNO should sign a BNO registration transaction" using (command.signers.toSet() == setOf(outputMembership.bn.bno.owningKey))
         "BNO registration transaction shouldn't contain any input" using (tx.inputs.isEmpty())
         "BNO registration transaction should contain an output state in ACTIVE status" using (outputMembership.isActive())
     }

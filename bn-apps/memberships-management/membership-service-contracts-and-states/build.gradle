@@ -11,8 +11,8 @@ apply plugin: 'net.corda.plugins.quasar-utils'
 apply plugin: "kotlin-jpa"
 
 cordapp {
-    targetPlatformVersion 4
-    minimumPlatformVersion 1
+    targetPlatformVersion corda_platform_target_version.toInteger()
+    minimumPlatformVersion corda_platform_minimum_version.toInteger()
     contract {
         name "business-network-membership-service-states"
         vendor "com.r3"
