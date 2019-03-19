@@ -143,7 +143,8 @@ data class MembershipState<out T : Any>(val member : Party,
         return when (schema) {
             is MembershipStateSchemaV1 -> MembershipStateSchemaV1.PersistentMembershipState(
                     member = this.member,
-                    bnId = this.bn.id,
+                    bnId = this.bn.id.id.toString(),
+                    bnName = this.bn.id.externalId ?: "",
                     bno = this.bn.bno,
                     status = this.status
             )
@@ -256,7 +257,7 @@ data class MyMembershipMetadata(override val roles: Set<Role>): MembershipMetada
 @CordaSerializable
 data class BusinessNetwork(val id: UniqueIdentifier, val bno: Party) {
     override fun equals(other: Any?) = (other as? BusinessNetwork)?.let {
-        this.id == other.id
+        this.id == other.id && this.bno == other.bno
     } ?: false
 
     val displayedName: String = id.externalId ?: bno.toString()

@@ -17,7 +17,9 @@ object MembershipStateSchemaV1 : MappedSchema(schemaFamily = MembershipState::cl
             @Column(name = "member_name")
             var member: Party,
             @Column(name = "bn_id")
-            var bnId: UniqueIdentifier,
+            var bnId: String,
+            @Column(name = "bn_name")
+            var bnName: String,
             @Column(name = "bno_name")
             var bno: Party,
             @Column(name = "status")
