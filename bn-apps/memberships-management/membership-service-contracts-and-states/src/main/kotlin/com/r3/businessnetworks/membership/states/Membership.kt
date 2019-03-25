@@ -4,7 +4,6 @@ import com.r3.businessnetworks.membership.states.MembershipStatus.ACTIVE
 import com.r3.businessnetworks.membership.states.MembershipStatus.PENDING
 import com.r3.businessnetworks.membership.states.MembershipStatus.SUSPENDED
 import net.corda.core.contracts.BelongsToContract
-import net.corda.core.contracts.CommandData
 import net.corda.core.contracts.CommandWithParties
 import net.corda.core.contracts.Contract
 import net.corda.core.contracts.LinearState
@@ -143,8 +142,8 @@ data class MembershipState<out T : Any>(val member : Party,
         return when (schema) {
             is MembershipStateSchemaV1 -> MembershipStateSchemaV1.PersistentMembershipState(
                     member = this.member,
-                    bnId = this.bn.id.id.toString(),
-                    bnName = this.bn.id.externalId ?: "",
+                    bnId = this.bn.bnId.id.toString(),
+                    bnName = this.bn.bnId.externalId ?: "",
                     bno = this.bn.bno,
                     status = this.status
             )
@@ -255,10 +254,16 @@ data class MyMembershipMetadata(override val roles: Set<Role>): MembershipMetada
 */
 
 @CordaSerializable
-data class BusinessNetwork(val id: UniqueIdentifier, val bno: Party) {
+data class BusinessNetwork(val bnId: UniqueIdentifier, val bno: Party) {
+    /**
+     * UUID id uniquely identifies the BN
+     */
     override fun equals(other: Any?) = (other as? BusinessNetwork)?.let {
-        this.id == other.id && this.bno == other.bno
+        this.bnId.id == other.bnId.id //&& this.bno == other.bno
     } ?: false
 
-    val displayedName: String = id.externalId ?: bno.toString()
+    fun hasDifferentBNO(other: BusinessNetwork) = this == other  && this.bno != other.bno
+    fun hasDifferentDisplayedName(other: BusinessNetwork) = this == other && this.displayedName != other.displayedName
+
+    val displayedName: String = bnId.externalId ?: bno.toString()
 }

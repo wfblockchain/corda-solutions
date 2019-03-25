@@ -37,7 +37,7 @@ class PersistentPendingMembershipRequest : Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id", nullable = false)
+    @Column(name = "bnId", nullable = false)
     var id : Long = 0
 
     @Column(name = "pending_member", nullable = false, unique = true)

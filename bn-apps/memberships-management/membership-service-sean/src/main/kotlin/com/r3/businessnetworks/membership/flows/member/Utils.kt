@@ -1,12 +1,13 @@
 package com.r3.businessnetworks.membership.flows.member
 
 import com.r3.businessnetworks.membership.flows.BNONotWhitelisted
-import com.r3.businessnetworks.membership.flows.member.service.MemberConfigurationService
+import com.r3.businessnetworks.membership.flows.service.MembershipConfigurationService
 import com.r3.businessnetworks.membership.states.MembershipState
 import net.corda.core.contracts.StateAndRef
 import net.corda.core.identity.Party
 import net.corda.core.node.ServiceHub
 import net.corda.core.utilities.loggerFor
+import java.util.*
 
 object Utils {
     val logger = loggerFor<Utils>()
@@ -22,12 +23,10 @@ object Utils {
         matches
     }.mapValues { it.value as StateAndRef<MembershipState<T>> }
 
-
-    fun throwExceptionIfNotBNO(bno : Party, serviceHub : ServiceHub) {
+    fun throwExceptionIfNotBNO(id: UUID? = null, bno : Party, serviceHub : ServiceHub) {
         // Only configured BNOs should be accepted
-        val configuration = serviceHub.cordaService(MemberConfigurationService::class.java)
-        if (bno !in configuration.bnoParties()) {
-            throw BNONotWhitelisted(bno)
-        }
+        val configuration = serviceHub.cordaService(MembershipConfigurationService::class.java)
+        configuration.bn(id, bno)
     }
+
 }

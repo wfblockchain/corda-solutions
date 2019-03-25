@@ -1,9 +1,11 @@
-package com.r3.businessnetworks.membership.flows.member.service
+package com.r3.businessnetworks.membership.flows.service
 
+import com.r3.businessnetworks.membership.flows.BNNotWhitelisted
+import com.r3.businessnetworks.membership.flows.BNBNOMismatchException
+import com.r3.businessnetworks.membership.flows.BusinessNetworkNotFound
 import com.typesafe.config.ConfigFactory
 import com.r3.businessnetworks.membership.flows.ConfigUtils.loadConfig
 import com.r3.businessnetworks.membership.states.BusinessNetwork
-import com.r3.businessnetworks.membership.states.MembershipContract
 import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
@@ -15,23 +17,25 @@ import java.io.File
 import java.util.*
 
 /**
- * Configuration that is used by member app.
+ * Configuration that is used by both bno and member apps.
  */
 @CordaService
-class MemberConfigurationService(private val serviceHub : ServiceHub) : SingletonSerializeAsToken() {
+class MembershipConfigurationService(private val serviceHub : ServiceHub) : SingletonSerializeAsToken() {
     companion object {
         // X500 name of the BNO
         const val BUSINESS_NETWORKS = "business-networks"
         const val BN_ID = "id"
         const val BN_NAME = "name"
         const val BN_BNO_NAME = "bnoName"
-        val logger = loggerFor<MemberConfigurationService>()
+        const val NOTARY_NAME = "notaryName"
+
+        val logger = loggerFor<MembershipConfigurationService>()
     }
 
     private var _config = loadConfig()
 
     /**
-     * Get the raw business networks in Triple(id, name, bnoName)
+     * Get the raw business networks in Triple(bnId, name, bnoName)
      */
     fun rawBNs(): Set<Triple<String, String, String>> {
         return (if (_config.hasPath(BUSINESS_NETWORKS)) _config.getObjectList(BUSINESS_NETWORKS) else listOf())
@@ -69,7 +73,7 @@ class MemberConfigurationService(private val serviceHub : ServiceHub) : Singleto
                     val x500Name = CordaX500Name.parse(config.getString(BN_BNO_NAME))
                     val party = serviceHub.identityService.wellKnownPartyFromX500Name(x500Name)
                     party?.let {
-                        BusinessNetwork(id = bnId, bno = it)
+                        BusinessNetwork(bnId = bnId, bno = it)
                     } ?: null
 
                 }.filterNotNull().toSet()
@@ -84,7 +88,32 @@ class MemberConfigurationService(private val serviceHub : ServiceHub) : Singleto
         }.toSet()
     }
 
-    fun bnFromBNO(bno: Party): BusinessNetwork? = bns().firstOrNull { it.bno == bno }
+    /**
+     * For CorDapps flow APIs, we will have the UUID of the BN as a parameter to identify the BN the CorDapp operates in.
+     */
+    fun bnFromId(id: UUID): BusinessNetwork? = bns().singleOrNull { it.bnId.id == id }
+
+    fun bnoFromId(id: UUID): Party? = bnFromId(id)?.bno
+
+    /**
+     * For a legacy CorDapp which does not have the desired UUID in the flow APIs, we use this to identify the BN from a given BNO.
+     * In this model, we cannot have more than one BN using the same BNO.
+     */
+    fun bnFromBNO(bno: Party): BusinessNetwork? = bns().singleOrNull { it.bno == bno }
+
+    fun bnsFromBNO(bno: Party): Set<BusinessNetwork> = bns().filter { it.bno == bno }.toSet()
+
+    /**
+     * This is the comprehensive validation logic to ensure id and bno are all matching for both the legacy and the new configurations.
+     */
+    fun bn(id: UUID?, bno: Party): BusinessNetwork = (id?.let {
+        val bn = bnFromId(id)
+        bn?.let { if (it.bno == bno) it else throw BNBNOMismatchException(it.bnId.id, bno) } ?: throw BNNotWhitelisted(it)
+    } ?: bnFromBNO(bno)) ?: throw BusinessNetworkNotFound(id, bno)
+
+    private fun notaryName() : CordaX500Name = CordaX500Name.parse(_config.getString(NOTARY_NAME))
+    fun notaryParty() = serviceHub.networkMapCache.getNotary(notaryName())
+            ?: throw IllegalArgumentException("Notary ${notaryName()} has not been found on the network")
 
     fun reloadConfigurationFromFile(file : File) {
         _config = ConfigFactory.parseFile(file)

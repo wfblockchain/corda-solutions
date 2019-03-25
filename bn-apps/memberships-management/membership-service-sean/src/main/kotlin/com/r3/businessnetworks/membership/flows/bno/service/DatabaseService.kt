@@ -1,6 +1,7 @@
 package com.r3.businessnetworks.membership.flows.bno.service
 
 import com.google.common.collect.ImmutableList
+import com.r3.businessnetworks.membership.states.BusinessNetwork
 import com.r3.businessnetworks.membership.states.MembershipState
 import com.r3.businessnetworks.membership.states.MembershipStateSchemaV1
 import net.corda.core.contracts.StateAndRef
@@ -37,7 +38,7 @@ class PersistentPendingMembershipRequest : Serializable {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
-    @Column(name = "id", nullable = false)
+    @Column(name = "bnId", nullable = false)
     var id : Long = 0
 
     @Column(name = "pending_member", nullable = false, unique = true)
@@ -45,12 +46,12 @@ class PersistentPendingMembershipRequest : Serializable {
 }
 
 
-
 /**
  * Used by BNO to interact with the underlying database.
  */
 @CordaService
 class DatabaseService(val serviceHub : ServiceHub) : SingletonSerializeAsToken() {
+    @Deprecated("Business Network is not uniquely identified by BNO any more.", ReplaceWith("getMembership(member : Party, bn : BusinessNetwork)"))
     fun getMembership(member : Party, bno : Party) : StateAndRef<MembershipState<Any>>? {
         val criteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                 .and(memberCriteria(member))
@@ -58,15 +59,33 @@ class DatabaseService(val serviceHub : ServiceHub) : SingletonSerializeAsToken()
         val states = serviceHub.vaultService.queryBy<MembershipState<Any>>(criteria).states
         return if (states.isEmpty()) null else (states.sortedBy { it.state.data.modified }.last())
     }
+    fun getMembership(member : Party, bn : BusinessNetwork) : StateAndRef<MembershipState<Any>>? {
+        val criteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                .and(memberCriteria(member))
+                .and(bnCriteria(bn.bnId.id.toString()))
+        val states = serviceHub.vaultService.queryBy<MembershipState<Any>>(criteria).states
+        return if (states.isEmpty()) null else (states.sortedBy { it.state.data.modified }.last())
+    }
 
+    @Deprecated("Business Network is not uniquely identified by BNO any more.", ReplaceWith("getAllMemberships(bn : BusinessNetwork)"))
     fun getAllMemberships(bno : Party) : List<StateAndRef<MembershipState<Any>>> {
         val criteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
                 .and(bnoCriteria(bno))
         return serviceHub.vaultService.queryBy<MembershipState<Any>>(criteria).states
     }
+    fun getAllMemberships(bn : BusinessNetwork) : List<StateAndRef<MembershipState<Any>>> {
+        val criteria = QueryCriteria.VaultQueryCriteria(Vault.StateStatus.UNCONSUMED)
+                .and(bnCriteria(bn.bnId.id.toString()))
+        return serviceHub.vaultService.queryBy<MembershipState<Any>>(criteria).states
+    }
 
+    @Deprecated("Business Network is not uniquely identified by BNO any more.", ReplaceWith("getActiveMemberships(bn : BusinessNetwork)"))
     fun getActiveMemberships(bno : Party)
             = getAllMemberships(bno).filter { it.state.data.isActive() }
+    fun getActiveMemberships(bn : BusinessNetwork)
+            = getAllMemberships(bn).filter { it.state.data.isActive() }
+    fun getActiveMembershipsExceptForBNO(bn : BusinessNetwork)
+            = getAllMemberships(bn).filter { !it.state.data.isBNO && it.state.data.isActive() }
 
     /**
      * This method exists to prevent the same member from being able to request a membership multiple times, while their first membership transaction is being processed.
@@ -97,4 +116,7 @@ class DatabaseService(val serviceHub : ServiceHub) : SingletonSerializeAsToken()
             = QueryCriteria.VaultCustomQueryCriteria(builder { MembershipStateSchemaV1.PersistentMembershipState::member.equal(member) })
     private fun bnoCriteria(bno: Party)
             = QueryCriteria.VaultCustomQueryCriteria(builder { MembershipStateSchemaV1.PersistentMembershipState::bno.equal(bno) })
+    private fun bnCriteria(id: String/*, bno: Party*/)
+            = QueryCriteria.VaultCustomQueryCriteria(builder { MembershipStateSchemaV1.PersistentMembershipState::bnId.equal(id) })
+            //.and(QueryCriteria.VaultCustomQueryCriteria(builder { MembershipStateSchemaV1.PersistentMembershipState::bno.equal(bno) }))
 }
