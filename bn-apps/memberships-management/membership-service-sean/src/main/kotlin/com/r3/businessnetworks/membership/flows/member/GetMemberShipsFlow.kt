@@ -15,7 +15,7 @@ import net.corda.core.utilities.unwrap
 import java.util.*
 
 @CordaSerializable
-class MembershipListRequest
+data class MembershipListRequest(val id: UUID?)
 
 @CordaSerializable
 data class MembershipsListResponse(val memberships : List<StateAndRef<MembershipState<Any>>>)
@@ -55,7 +55,7 @@ open class GetMembershipsFlow(id: UUID?, bno : Party, private val forceRefresh :
 
         if (forceRefresh || lastRefreshed == null) {
             val bnoSession = initiateFlow(bno)
-            val response = bnoSession.sendAndReceive<MembershipsListResponse>(MembershipListRequest()).unwrap { it }
+            val response = bnoSession.sendAndReceive<MembershipsListResponse>(MembershipListRequest(id)).unwrap { it }
             cache.applyMembershipsSnapshot(response.memberships)
         }
 

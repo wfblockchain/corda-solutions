@@ -1,11 +1,10 @@
 package com.r3.businessnetworks.membership.flows
 
 import co.paralleluniverse.fibers.Suspendable
-import com.r3.businessnetworks.membership.flows.bno.ActivateMembershipFlow
-import com.r3.businessnetworks.membership.flows.bno.ActivateMembershipForPartyFlow
-import com.r3.businessnetworks.membership.flows.bno.NotifyMemberFlow
-import com.r3.businessnetworks.membership.flows.bno.RegisterBNOFlow
+import com.r3.businessnetworks.membership.flows.bno.*
 import com.r3.businessnetworks.membership.flows.bno.service.DatabaseService
+import com.r3.businessnetworks.membership.flows.member.AmendMembershipMetadataFlow
+import com.r3.businessnetworks.membership.flows.member.GetMembershipsFlow
 import com.r3.businessnetworks.membership.flows.member.NotifyMemberFlowResponder
 import com.r3.businessnetworks.membership.flows.member.RequestMembershipFlow
 import com.r3.businessnetworks.membership.states.BusinessNetwork
@@ -99,7 +98,7 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
     @After
     open fun tearDown() {
         mockNetwork.stopNodes()
-//        NotificationsCounterFlow.NOTIFICATIONS.clear()
+        NotificationsCounterFlow.NOTIFICATIONS.clear()
     }
 
     fun runRegisterBNOFlow(id: UUID, node: StartedMockNode, membershipMetadata : Any = MembershipMetadata(setOf())): SignedTransaction {
@@ -109,15 +108,15 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
 
     }
 
-//    fun runRequestAndActivateMembershipFlow(bnoNode : StartedMockNode, participantNode : StartedMockNode, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) {
-//        runRequestMembershipFlow(bnoNode, participantNode, membershipMetadata)
-//        runActivateMembershipFlow(bnoNode, participantNode.identity())
-//    }
+    fun runRequestAndActivateMembershipFlow(id: UUID, bnoNode : StartedMockNode, participantNode : StartedMockNode, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) {
+        runRequestMembershipFlow(id, bnoNode, participantNode, membershipMetadata)
+        runActivateMembershipFlow(id, /*bnoNode,*/ participantNode.identity())
+    }
 
-//    fun runRequestAndActivateMembershipFlow(bnoNode : StartedMockNode, participantNodes : List<StartedMockNode>, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) {
-//        runRequestMembershipFlow(bnoNode, participantNodes, membershipMetadata)
-//        runActivateMembershipFlow(bnoNode, participantNodes.map { it.identity() })
-//    }
+    fun runRequestAndActivateMembershipFlow(id: UUID, bnoNode : StartedMockNode, participantNodes : List<StartedMockNode>, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) {
+        runRequestMembershipFlow(id, bnoNode, participantNodes, membershipMetadata)
+        runActivateMembershipFlow(id, /*bnoNode,*/ participantNodes.map { it.identity() })
+    }
 
     fun runRequestMembershipFlow(id: UUID, bnoNode : StartedMockNode, participantNode : StartedMockNode, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) : SignedTransaction {
         val future = participantNode.startFlow(RequestMembershipFlow(id = id, bno = bnoNode.identity(), membershipMetadata = membershipMetadata))
@@ -125,23 +124,26 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
         return future.getOrThrow()
     }
 
-//    fun runRequestMembershipFlow(bnoNode : StartedMockNode, participantNodes : List<StartedMockNode>, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) : List<SignedTransaction> {
-//        return participantNodes.map { runRequestMembershipFlow(bnoNode, it, membershipMetadata) }
-//    }
+    fun runRequestMembershipFlow(id: UUID, bnoNode : StartedMockNode, participantNodes : List<StartedMockNode>, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT")) : List<SignedTransaction> {
+        return participantNodes.map { runRequestMembershipFlow(id, bnoNode, it, membershipMetadata) }
+    }
 
-//    fun runSuspendMembershipFlow(bnoNode : StartedMockNode, participant : Party) : SignedTransaction {
-//        val membership = getMembership(bnoNode, participant, bnoNode.identity())
-//        val future = bnoNode.startFlow(SuspendMembershipFlow(membership))
-//        mockNetwork.runNetwork()
-//        return future.getOrThrow()
-//    }
+    fun runSuspendMembershipFlow(id: UUID, /*bnoNode : StartedMockNode,*/ participant : Party) : SignedTransaction {
+        val bn: BusinessNetwork = bnAndNodePairs.toList().filter { it.first.bnId.id == id }.first().first
+        val bnoNode: StartedMockNode = bnAndNodePairs.toList().filter { it.first.bnId.id == id }.first().second
+        val membership = getMembership(bnoNode, participant, bn)
+        val future = bnoNode.startFlow(SuspendMembershipFlow(id, membership))
+        mockNetwork.runNetwork()
+        return future.getOrThrow()
+    }
 
-//    fun runSuspendMembershipForPartyFlow(bnoNode : StartedMockNode, participant : Party) : SignedTransaction {
-//        val future = bnoNode.startFlow(SuspendMembershipForPartyFlow(participant))
-//        mockNetwork.runNetwork()
-//        return future.getOrThrow()
-//    }
-//
+    fun runSuspendMembershipForPartyFlow(id: UUID, /*bnoNode : StartedMockNode,*/ participant : Party) : SignedTransaction {
+        val bnoNode: StartedMockNode = bnAndNodePairs.toList().filter { it.first.bnId.id == id }.first().second
+        val future = bnoNode.startFlow(SuspendMembershipForPartyFlow(id, participant))
+        mockNetwork.runNetwork()
+        return future.getOrThrow()
+    }
+
     fun runActivateMembershipFlow(id: UUID, /*bnoNode : StartedMockNode,*/ participant : Party) : SignedTransaction {
         val bn: BusinessNetwork = bnAndNodePairs.toList().filter { it.first.bnId.id == id }.first().first
         val bnoNode: StartedMockNode = bnAndNodePairs.toList().filter { it.first.bnId.id == id }.first().second
@@ -162,18 +164,18 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
         return future.getOrThrow()
     }
 
-//    fun runAmendMetadataFlow(bnoNode : StartedMockNode, participantNode : StartedMockNode, newMetadata : Any) : SignedTransaction {
-//        val future = participantNode.startFlow(AmendMembershipMetadataFlow(bnoNode.identity(), newMetadata))
-//        mockNetwork.runNetwork()
-//        return future.getOrThrow()
-//    }
-//
-//    fun runGetMembershipsListFlow(bnoNode : StartedMockNode, participantNode : StartedMockNode, force : Boolean = false, filterOutNotExisting : Boolean = true) : Map<Party, StateAndRef<MembershipState<Any>>> {
-//        val future = participantNode.startFlow(GetMembershipsFlow(bnoNode.identity(), force, filterOutNotExisting))
-//        mockNetwork.runNetwork()
-//        return future.getOrThrow()
-//    }
-//
+    fun runAmendMetadataFlow(id: UUID?, bnoNode : StartedMockNode, participantNode : StartedMockNode, newMetadata : Any) : SignedTransaction {
+        val future = participantNode.startFlow(AmendMembershipMetadataFlow(id, bnoNode.identity(), newMetadata))
+        mockNetwork.runNetwork()
+        return future.getOrThrow()
+    }
+
+    fun runGetMembershipsListFlow(id: UUID, bnoNode : StartedMockNode, participantNode : StartedMockNode, force : Boolean = false, filterOutNotExisting : Boolean = true) : Map<Party, StateAndRef<MembershipState<Any>>> {
+        val future = participantNode.startFlow(GetMembershipsFlow(id, bnoNode.identity(), force, filterOutNotExisting))
+        mockNetwork.runNetwork()
+        return future.getOrThrow()
+    }
+
     fun getMembership(nodeToGetFrom : StartedMockNode, member : Party, bn : BusinessNetwork) : StateAndRef<MembershipState<Any>> = nodeToGetFrom.transaction {
         val dbService = nodeToGetFrom.services.cordaService(DatabaseService::class.java)
         dbService.getMembership(member, bn)!!

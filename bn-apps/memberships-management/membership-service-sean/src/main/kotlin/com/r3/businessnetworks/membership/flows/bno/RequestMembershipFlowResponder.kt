@@ -39,7 +39,12 @@ open class RequestMembershipFlowResponder(val session : FlowSession) : BusinessN
          * Note: we don't use bn() from BusinessNetworkOperatorFlowLogic because we don't have the BN's UUID.
          */
         val request = session.receive<OnBoardingRequest>().unwrap { it }
-        val bn = request.bn
+        /**
+         * Note: Superclass BusinessNetworkOperatorFlowLogic needs the BN.bnId.id to be defined.
+         * We only get it after receiving OnBoardingRequest which has bn in it.
+         */
+        this._id = request.bn.bnId.id
+        val bn = bn()
         val metadata = request.metadata
         /**
          * Get the services
@@ -75,7 +80,7 @@ open class RequestMembershipFlowResponder(val session : FlowSession) : BusinessN
             val notary = configuration.notaryParty()
 
             // issue pending membership state on the ledger
-            membership = MembershipState(counterparty, bn, request.metadata)
+            membership = MembershipState(counterparty, bn, metadata)
             val builder = TransactionBuilder(notary)
                     .addOutputState(membership, MembershipContract.CONTRACT_NAME)
                     .addCommand(MembershipContract.Commands.Request(), counterparty.owningKey, ourIdentity.owningKey)

@@ -8,6 +8,7 @@ import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.InitiatingFlow
 import net.corda.core.identity.Party
 import net.corda.core.serialization.CordaSerializable
+import java.util.*
 
 @CordaSerializable
 data class OnMembershipChanged(val changedMembership : StateAndRef<MembershipState<Any>>)
@@ -15,7 +16,7 @@ data class OnMembershipChanged(val changedMembership : StateAndRef<MembershipSta
 /**
  * Flow that is used by BNO to notify active BN members about changes to the membership list.
  */
-class NotifyActiveMembersFlow(private val notification : Any) : BusinessNetworkOperatorFlowLogic<Unit>() {
+class NotifyActiveMembersFlow(private val id: UUID?, private val notification : Any) : BusinessNetworkOperatorFlowLogic<Unit>(id) {
     @Suspendable
     override fun call() {
         val memberships = getActiveMembershipsExceptForBNO() //getActiveMembershipStates()
