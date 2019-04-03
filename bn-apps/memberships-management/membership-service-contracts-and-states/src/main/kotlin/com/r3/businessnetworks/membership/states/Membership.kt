@@ -240,6 +240,8 @@ object MyRole {
 /**
  * Base membership metadata which must include roles.
  * There is an example of how to extend it for a BN.
+ * TODO: Do we really need to extend this class?
+ * Otherwise, we better use a data class for it.
  */
 @CordaSerializable
 open class MembershipMetadata(open val roles: Set<Role>)

@@ -204,13 +204,16 @@ class GetMembershipsFlowTest : AbstractFlowTest(
         val bn1MembershipsList = runGetMembershipsListFlow(id1, bno1Node, multiBnParticipant)
         val bn2MembershipsList = runGetMembershipsListFlow(id2, bno2Node, multiBnParticipant)
 
+        val bn1MembershipsListWithoutBNO = bn1MembershipsList.filter { !it.value.state.data.isBNO }
+        val bn2MembershipsListWithoutBNO = bn2MembershipsList.filter { !it.value.state.data.isBNO }
+
         // verifying that different business networks can have different metadata associated with the membership states
-        assertEquals(bn1Metadata, bn1MembershipsList.values.single().state.data.membershipMetadata)
-        assertEquals(bn2Metadata, bn2MembershipsList.values.single().state.data.membershipMetadata)
+        assertEquals(bn1Metadata, bn1MembershipsListWithoutBNO.values.single().state.data.membershipMetadata)
+        assertEquals(bn2Metadata, bn2MembershipsListWithoutBNO.values.single().state.data.membershipMetadata)
     }
 
-    @Test(expected = BNONotWhitelisted::class)
-    fun `the flow can be run only against whitelisted BNOs`() {
+    @Test(expected = BNNotWhitelisted::class)
+    fun `the flow can be run only against whitelisted BNs`() {
         val bn = bnAndNodePairs.toList().first().first
         val id = bn.bnId.id
         val bnoNode = bnAndNodePairs.toList().first().second
@@ -229,6 +232,7 @@ class GetMembershipsFlowTest : AbstractFlowTest(
         val id = bn.bnId.id
         val bnoNode = bnAndNodePairs.toList().first().second
 
+        runRegisterBNOFlow(id, bnoNode)
         runRequestAndActivateMembershipFlow(id, bnoNode, participantsNodes)
 
         val suspendedMember = participantsNodes.first()
@@ -248,7 +252,7 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
         // making sure that the cache gets repopulated again
         val memberships = runGetMembershipsListFlow(id, bnoNode, suspendedMember, true)
-        assertEquals(participantsNodes.identities().toSet(), memberships.map { it.value.state.data.member }.toSet())
+        assertEquals(participantsNodes.identities().toSet(), memberships.map { it.value.state.data.member }.filter{ it.name != bnoNode.identity().name }.toSet())
     }
 
 }

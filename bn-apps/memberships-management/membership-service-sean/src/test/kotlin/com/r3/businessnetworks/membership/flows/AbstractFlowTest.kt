@@ -7,6 +7,7 @@ import com.r3.businessnetworks.membership.flows.member.AmendMembershipMetadataFl
 import com.r3.businessnetworks.membership.flows.member.GetMembershipsFlow
 import com.r3.businessnetworks.membership.flows.member.NotifyMemberFlowResponder
 import com.r3.businessnetworks.membership.flows.member.RequestMembershipFlow
+import com.r3.businessnetworks.membership.flows.member.support.BusinessNetworkAwareInitiatedFlow
 import com.r3.businessnetworks.membership.states.BusinessNetwork
 import com.r3.businessnetworks.membership.states.MembershipMetadata
 import com.r3.businessnetworks.membership.states.MembershipState
@@ -27,6 +28,7 @@ import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
 import net.corda.core.utilities.getOrThrow
+import net.corda.core.utilities.unwrap
 import net.corda.testing.common.internal.testNetworkParameters
 import net.corda.testing.node.MockNetwork
 import net.corda.testing.node.MockNetworkNotarySpec
@@ -101,7 +103,11 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
         NotificationsCounterFlow.NOTIFICATIONS.clear()
     }
 
-    fun runRegisterBNOFlow(id: UUID, node: StartedMockNode, membershipMetadata : Any = MembershipMetadata(setOf())): SignedTransaction {
+    /**
+     * MembershipMetadata(setOf()) will fail GetMembershipsFlowTest `node should maintain separate lists of memberships per business network`()
+     * because MembershipeMetadata is not a data class.
+     */
+    fun runRegisterBNOFlow(id: UUID, node: StartedMockNode, membershipMetadata : Any = SimpleMembershipMetadata(role = "DEFAULT") /*MembershipMetadata(setOf())*/): SignedTransaction {
         val future = node.startFlow(RegisterBNOFlow(id, membershipMetadata))
         mockNetwork.runNetwork()
         return future.getOrThrow()
@@ -211,3 +217,21 @@ class NotificationsCounterFlow(session : FlowSession) : NotifyMemberFlowResponde
 
 data class NotificationHolder(val member : Party, val bno : Party, val notification : Any)
 
+open class AbstractDummyInitiatingFlow(private val counterparty : Party) : FlowLogic<Unit>() {
+    @Suspendable
+    override fun call() {
+        initiateFlow(counterparty).sendAndReceive<String>("Hello")
+    }
+}
+
+open class AbstractBNAwareRespondingFlow(session : FlowSession, private val id: UUID?, private val bnoName : String) : BusinessNetworkAwareInitiatedFlow<Unit>(session)  {
+    //    override fun bnoIdentity()  = serviceHub.identityService.wellKnownPartyFromX500Name(CordaX500Name.parse(bnoName))!!
+    override fun bn() = confSvc().bn(id, serviceHub.identityService.wellKnownPartyFromX500Name(CordaX500Name.parse(bnoName))!!)
+    override fun bnoIdentity() = bn().bno
+
+    @Suspendable
+    override fun onOtherPartyMembershipVerified() {
+        flowSession.receive<String>().unwrap { it }
+        flowSession.send("Hello")
+    }
+}

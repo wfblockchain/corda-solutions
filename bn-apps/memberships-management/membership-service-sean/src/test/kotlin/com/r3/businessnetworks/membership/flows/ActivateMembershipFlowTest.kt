@@ -106,22 +106,3 @@ class ActivateMembershipFlowTest : AbstractFlowTest(
         assertEquals(NotificationHolder(participantNode.identity(), bnoNode.identity(), OnMembershipChanged(updatedMembership)), NotificationsCounterFlow.NOTIFICATIONS.single())
     }
 }
-
-open class AbstractDummyInitiatingFlow(private val counterparty : Party) : FlowLogic<Unit>() {
-    @Suspendable
-    override fun call() {
-        initiateFlow(counterparty).sendAndReceive<String>("Hello")
-    }
-}
-
-open class AbstractBNAwareRespondingFlow(session : FlowSession, private val id: UUID?, private val bnoName : String) : BusinessNetworkAwareInitiatedFlow<Unit>(session)  {
-//    override fun bnoIdentity()  = serviceHub.identityService.wellKnownPartyFromX500Name(CordaX500Name.parse(bnoName))!!
-    override fun bn() = confSvc().bn(id, serviceHub.identityService.wellKnownPartyFromX500Name(CordaX500Name.parse(bnoName))!!)
-    override fun bnoIdentity() = bn().bno
-
-    @Suspendable
-    override fun onOtherPartyMembershipVerified() {
-        flowSession.receive<String>().unwrap { it }
-        flowSession.send("Hello")
-    }
-}
