@@ -16,11 +16,6 @@ class AmendMembershipMetadataFlowTest : AbstractFlowTest(
 
     @Test
     fun `amend metadata happy path`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-        val participantNode = participantsNodes.first()
-
         runRegisterBNOFlow(id, bnoNode)
 
         runRequestAndActivateMembershipFlow(id, bnoNode, participantsNodes)
@@ -52,9 +47,6 @@ class AmendMembershipMetadataFlowTest : AbstractFlowTest(
 
     @Test
     fun `non members should not be able to amend their metadata`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         val memberNode = participantsNodes.first()
 
         runRegisterBNOFlow(id, bnoNode)
@@ -70,15 +62,11 @@ class AmendMembershipMetadataFlowTest : AbstractFlowTest(
 
     @Test
     fun `should be able to perform custom metadata verification`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         bnoNode.registerInitiatedFlow(AmendMembershipMetadataFlowResponderWithCustomVerification::class.java)
 
         runRegisterBNOFlow(id, bnoNode)
         runRequestAndActivateMembershipFlow(id, bnoNode, participantsNodes)
 
-        val participantNode = participantsNodes.first()
         val existingMembership = getMembership(participantNode, participantNode.identity(), bn)
         val newMetadata = (existingMembership.state.data.membershipMetadata as SimpleMembershipMetadata).copy(role = "Some other role")
 

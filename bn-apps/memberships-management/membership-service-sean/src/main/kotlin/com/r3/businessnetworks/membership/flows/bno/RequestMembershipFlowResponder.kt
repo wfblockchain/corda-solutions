@@ -105,9 +105,6 @@ open class RequestMembershipFlowResponder(val session : FlowSession) : BusinessN
             }
         }
 
-        /**
-         * TODO: Temporary comment out because we do ActivateMembershipFlow later
-         */
         if (activateRightAway(membership, configuration)) {
             logger.info("Auto-activating membership for party ${membership.member}")
             val stateToActivate = findMembershipStateForParty(membership.member)

@@ -30,10 +30,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
         participantRespondingFlows = listOf(GetMembershipsFlowResponder::class.java)) {
     @Test
     fun `GetMembershipsFlow should return all active memberships to all business network members`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
         runRegisterBNOFlow(id, bnoNode)
 
         runRequestAndActivateMembershipFlow(id, bnoNode, participantsNodes)
@@ -50,10 +46,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
     @Test
     fun `GetMembershipsFlow should not return suspended memberships`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
         val suspendedNode = participantsNodes[0]
         val okNode = participantsNodes[2]
 
@@ -66,10 +58,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
     @Test
     fun `GetMembershipsFlow should not return pending memberships`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
         val pendingNode = participantsNodes[1]
         val okNode = participantsNodes[2]
 
@@ -82,10 +70,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
     @Test
     fun `only active members should be able to use this flow`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
         val suspendedNode = participantsNodes[0]
         val pendingNode = participantsNodes[1]
         val notMember = participantsNodes[3]
@@ -116,10 +100,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
     @Test
     fun `nodes that are not in the Network Map should be filtered out from the list`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
         runRegisterBNOFlow(id, bnoNode)
         // requesting memberships
         runRequestAndActivateMembershipFlow(id, bnoNode, participantsNodes)
@@ -214,11 +194,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
     @Test(expected = BNNotWhitelisted::class)
     fun `the flow can be run only against whitelisted BNs`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-        val participantNode = participantsNodes[0]
-
         participantNode.services.cordaService(MembershipConfigurationService::class.java).reloadConfigurationFromFile(fileFromClasspath("membership-service-without-bno-whitelist.conf"))
 
         runRegisterBNOFlow(id, bnoNode)
@@ -228,10 +203,6 @@ class GetMembershipsFlowTest : AbstractFlowTest(
 
     @Test
     fun `when membership gets activated after suspension the membership cache should be repopulated with the list of current members`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
         runRegisterBNOFlow(id, bnoNode)
         runRequestAndActivateMembershipFlow(id, bnoNode, participantsNodes)
 

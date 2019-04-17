@@ -7,14 +7,10 @@ import org.junit.Test
 class RegisterBNOFlowTest : AbstractFlowTest(numberOfParticipants = 2) {
     @Test(expected = BNBNOMismatchException::class)
     fun `Only BNO can call RegisterBNOFlow`() {
-        val participantNode = participantsNodes.first()
-        val id = bnAndNodePairs.toList().first().first.bnId.id
         runRegisterBNOFlow(id, participantNode)
     }
     @Test
     fun `Register BNO happy path`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         val stx = runRegisterBNOFlow(id, bnoNode)
         assert(stx.tx.inputs.isEmpty())
         assert(stx.notary!!.name == notaryName)
@@ -31,8 +27,6 @@ class RegisterBNOFlowTest : AbstractFlowTest(numberOfParticipants = 2) {
     }
     @Test(expected = NonEmptyBNException::class)
     fun `Register BNO can only happen with a fresh network`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         runRegisterBNOFlow(id, bnoNode)
         /**
          * Running the second time will fail

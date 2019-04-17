@@ -24,6 +24,7 @@ import net.corda.core.contracts.UniqueIdentifier
 import net.corda.core.flows.FlowLogic
 import net.corda.core.flows.FlowSession
 import net.corda.core.flows.InitiatedBy
+import net.corda.core.flows.InitiatingFlow
 import net.corda.core.identity.CordaX500Name
 import net.corda.core.identity.Party
 import net.corda.core.transactions.SignedTransaction
@@ -53,7 +54,11 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
     val notaryName = CordaX500Name.parse("O=Notary,L=London,C=GB")
     lateinit var bnoNodes : List<StartedMockNode>
     lateinit var bnAndNodePairs: List<Pair<BusinessNetwork, StartedMockNode>>
+    lateinit var bn: BusinessNetwork
+    lateinit var id: UUID
+    lateinit var bnoNode: StartedMockNode
     lateinit var participantsNodes : List<StartedMockNode>
+    lateinit var participantNode: StartedMockNode
     lateinit var mockNetwork : MockNetwork
     /**
      * Note: these should be consistent with membership-service.conf
@@ -80,6 +85,9 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
             bnoRespondingFlows.forEach { bnoNode.registerInitiatedFlow(it) }
             Pair(bn, bnoNode)
         }
+        bn = bnAndNodePairs.toList().first().first
+        id = bn.bnId.id
+        bnoNode = bnAndNodePairs.toList().first().second
 
         bnoNodes = bnAndNodePairs.map {
             it.second
@@ -90,6 +98,7 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
             participantRespondingFlows.forEach { node.registerInitiatedFlow(it) }
             node
         }
+        participantNode = participantsNodes.first()
 
         mockNetwork.runNetwork()
     }
@@ -235,3 +244,33 @@ open class AbstractBNAwareRespondingFlow(session : FlowSession, private val id: 
         flowSession.send("Hello")
     }
 }
+
+@InitiatingFlow
+class BN_1_InitiatingFlow(counterparty : Party) : AbstractDummyInitiatingFlow(counterparty)
+
+@InitiatingFlow
+class BN_2_InitiatingFlow(counterparty : Party) : AbstractDummyInitiatingFlow(counterparty)
+
+@InitiatingFlow
+class BN_3_InitiatingFlow(counterparty : Party) : AbstractDummyInitiatingFlow(counterparty)
+
+@InitiatingFlow
+class BN_4_InitiatingFlow(counterparty : Party) : AbstractDummyInitiatingFlow(counterparty)
+
+@InitiatingFlow
+class BN_5_InitiatingFlow(counterparty : Party) : AbstractDummyInitiatingFlow(counterparty)
+
+@InitiatedBy(BN_1_InitiatingFlow::class)
+class BN_1_RespondingFlow(session : FlowSession) : AbstractBNAwareRespondingFlow(session, null,"CN=WFBN,OU=Finance,O=WFC,L=San Francisco,C=US")
+
+@InitiatedBy(BN_2_InitiatingFlow::class)
+class BN_2_RespondingFlow(session : FlowSession) : AbstractBNAwareRespondingFlow(session, null,"CN=Servicer,OU=Lending,O=WFC,L=San Francisco,C=US")
+
+@InitiatedBy(BN_3_InitiatingFlow::class)
+class BN_3_RespondingFlow(session : FlowSession) : AbstractBNAwareRespondingFlow(session, null,"CN=Servicer,OU=Lending,O=WFC,L=San Francisco,C=US")
+
+@InitiatedBy(BN_4_InitiatingFlow::class)
+class BN_4_RespondingFlow(session : FlowSession) : AbstractBNAwareRespondingFlow(session, null,"CN=Servicer,OU=Lending,O=WFC,L=San Francisco,C=US")
+
+@InitiatedBy(BN_5_InitiatingFlow::class)
+class BN_5_RespondingFlow(session : FlowSession) : AbstractBNAwareRespondingFlow(session, null,"CN=Servicer,OU=Lending,O=WFC,L=San Francisco,C=US")

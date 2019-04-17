@@ -16,9 +16,6 @@ class SuspendMembershipFlowTest : AbstractFlowTest(
         participantRespondingFlows = listOf(NotificationsCounterFlow::class.java)) {
 
     private fun testMembershipSuspension(suspender : (id: UUID, /*bnoNode : StartedMockNode,*/ participantNode : StartedMockNode) -> SignedTransaction) {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         val suspendedMemberNode = participantsNodes.first()
 
         runRegisterBNOFlow(id, bnoNode)
@@ -53,9 +50,6 @@ class SuspendMembershipFlowTest : AbstractFlowTest(
 
     @Test(expected = BNBNOMismatchException::class)
     fun `only BNO should be able to start the flow`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         val memberNode = participantsNodes.first()
 
         runRegisterBNOFlow(id, bnoNode)

@@ -29,11 +29,6 @@ class ActivateMembershipFlowTest : AbstractFlowTest(
         participantRespondingFlows = listOf(NotificationsCounterFlow::class.java)) {
 
     private fun testMembershipActivation(activateCallback : (id: UUID, /*bnoNode : StartedMockNode,*/ participantNode : StartedMockNode) -> SignedTransaction) {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-        val participantNode = participantsNodes.first()
-
         runRegisterBNOFlow(id, bnoNode)
 
         runRequestMembershipFlow(id, bnoNode, participantNode)
@@ -70,11 +65,6 @@ class ActivateMembershipFlowTest : AbstractFlowTest(
 
     @Test(expected = BNBNOMismatchException::class)
     fun `only BNO should be able to start the flow`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-        val participantNode = participantsNodes.first()
-
         runRegisterBNOFlow(id, bnoNode)
 
         runRequestMembershipFlow(id, bnoNode, participantNode)
@@ -86,13 +76,9 @@ class ActivateMembershipFlowTest : AbstractFlowTest(
 
     @Test
     fun `membership can be auto activated`() {
-        val bn = bnAndNodePairs.toList().first().first
-        val id = bn.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         bnoNode.registerInitiatedFlow(AutoApprovingMembershipFlow::class.java)
         val bnoConfiguration = bnoNode.services.cordaService(MembershipConfigurationService::class.java)
         bnoConfiguration.reloadConfigurationFromFile(fileFromClasspath("membership-service.conf"))
-        val participantNode = participantsNodes.first()
 
         runRegisterBNOFlow(id, bnoNode)
 

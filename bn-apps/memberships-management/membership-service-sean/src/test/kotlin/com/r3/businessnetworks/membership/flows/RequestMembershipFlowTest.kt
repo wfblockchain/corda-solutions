@@ -18,11 +18,6 @@ class RequestMembershipFlowTest : AbstractFlowTest(
 
     @Test
     fun `membership request happy path`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
-        val participantNode = participantsNodes.first()
-
         runRegisterBNOFlow(id, bnoNode)
 
         val stx = runRequestMembershipFlow(id, bnoNode, participantNode)
@@ -46,11 +41,6 @@ class RequestMembershipFlowTest : AbstractFlowTest(
 
     @Test
     fun `membership request should fail if a membership state already exists`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
-        val participantNode = participantsNodes.first()
-
         runRegisterBNOFlow(id, bnoNode)
 
         runRequestMembershipFlow(id, bnoNode, participantNode)
@@ -64,9 +54,6 @@ class RequestMembershipFlowTest : AbstractFlowTest(
 
     @Test
     fun `membership request should fail if another membership request form the same member is already in progress`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-        val participantNode = participantsNodes.first()
         val databaseService = bnoNode.services.cordaService(DatabaseService::class.java)
 
         bnoNode.transaction {
@@ -88,10 +75,6 @@ class RequestMembershipFlowTest : AbstractFlowTest(
 
     @Test(expected = BNNotWhitelisted::class)
     fun `the flow can be run only against whitelisted BNOs`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
-
-        val participantNode = participantsNodes.first()
         participantNode.services.cordaService(MembershipConfigurationService::class.java).reloadConfigurationFromFile(fileFromClasspath("membership-service-without-bno-whitelist.conf"))
 
         runRegisterBNOFlow(id, bnoNode)
@@ -100,11 +83,7 @@ class RequestMembershipFlowTest : AbstractFlowTest(
 
     @Test
     fun `should be able to perform a custom metadata verification`() {
-        val id = bnAndNodePairs.toList().first().first.bnId.id
-        val bnoNode = bnAndNodePairs.toList().first().second
         bnoNode.registerInitiatedFlow(RequestMembershipFlowResponderWithMetadataVerification::class.java)
-
-        val participantNode = participantsNodes.first()
 
         try {
             runRegisterBNOFlow(id, bnoNode)
