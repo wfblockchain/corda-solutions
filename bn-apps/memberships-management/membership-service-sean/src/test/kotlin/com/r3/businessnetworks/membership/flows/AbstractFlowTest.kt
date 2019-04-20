@@ -75,6 +75,10 @@ abstract class AbstractFlowTest(private val numberOfBusinessNetworks : Int = 2,
                 cordappPackages = listOf("com.r3.businessnetworks.membership.flows", "com.r3.businessnetworks.membership.states"),
                 notarySpecs = listOf(MockNetworkNotarySpec(notaryName)),
                 networkParameters = testNetworkParameters(minimumPlatformVersion = 4)
+                /**
+                 * set threadPerNode = false to enable debugging into flows.
+                 */
+                ,threadPerNode = false
         )
 
         bnAndNodePairs = rawBusinessNetworks.map {
