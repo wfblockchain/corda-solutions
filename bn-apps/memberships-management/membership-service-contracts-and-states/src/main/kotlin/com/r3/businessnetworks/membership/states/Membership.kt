@@ -145,6 +145,7 @@ data class MembershipState<out T : Any>(val member : Party,
                     bnId = this.bn.bnId.id.toString(),
                     bnName = this.bn.bnId.externalId ?: "",
                     bno = this.bn.bno,
+                    membershipMetadata = this.membershipMetadata.toString(),
                     status = this.status
             )
             else -> throw IllegalArgumentException("Unrecognised schema $schema")

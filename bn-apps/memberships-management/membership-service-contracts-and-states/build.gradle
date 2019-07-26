@@ -20,9 +20,16 @@ cordapp {
         versionId 1
     }
     signing {
-        enabled false
+        enabled true
+        options {
+            // TODO: Is there a better way to get the resources folder
+            keystore "src/main/resources/certificates/wfcdevcodesigner.jks"
+            alias "codesigner"
+            storepass "wfcpass"
+            keypass "wfcpass"
+            storetype "JKS"
+        }
     }
-
 }
 
 sourceSets {

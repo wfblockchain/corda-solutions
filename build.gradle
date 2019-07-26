@@ -34,7 +34,8 @@ plugins {
 }
 
 allprojects {
-    version "2.0-SNAPSHOT"
+    version "2.0-WFC"
+//    version "2.0-SNAPSHOT"
     group "com.r3.businessnetworks"
 
     configurations.all {

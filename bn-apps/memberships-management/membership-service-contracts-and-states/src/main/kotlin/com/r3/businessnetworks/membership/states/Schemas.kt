@@ -22,6 +22,8 @@ object MembershipStateSchemaV1 : MappedSchema(schemaFamily = MembershipState::cl
             var bnName: String,
             @Column(name = "bno_name")
             var bno: Party,
+            @Column(name = "membership_metadata")
+            var membershipMetadata: String,
             @Column(name = "status")
             var status: MembershipStatus) : PersistentState()
 }
