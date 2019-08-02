@@ -45,12 +45,16 @@ open class SuspendMembershipFlow(private val id: UUID?, val membership : StateAn
         builder.verify(serviceHub)
         val selfSignedTx = serviceHub.signInitialTransaction(builder)
 
+        val allActiveMembers = getActiveMembershipsExceptForBNO().map { it.state.data.member }.toSet()  + membership.state.data.member
         val memberSession = initiateFlow(membership.state.data.member)
+        val memberSessions = allActiveMembers.map {
+            initiateFlow(it)
+        }
 
         val finalisedTx = if (memberSession.getCounterpartyFlowInfo().flowVersion == 1) {
             subFlow(FinalityFlow(selfSignedTx))
         } else {
-            subFlow(FinalityFlow(selfSignedTx, memberSession))
+            subFlow(FinalityFlow(selfSignedTx, memberSessions))
         }
 
         val dbService = serviceHub.cordaService(DatabaseService::class.java)

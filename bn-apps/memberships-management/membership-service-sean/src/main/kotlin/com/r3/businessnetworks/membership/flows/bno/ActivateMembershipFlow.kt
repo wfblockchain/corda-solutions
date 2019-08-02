@@ -19,6 +19,16 @@ import java.util.*
  * The flow changes status of a PENDING or SUSPENDED membership to ACTIVE. The flow can be started only by BNO. BNO can unilaterally
  * activate memberships and no member's signature is required. After a membership is activated, the flow
  * fires-and-forgets [OnMembershipChanged] notification to all business network members.
+ * WFC Note: We make all nodes in networkmap except for BNO and the notary the observers of this transaction so that they can
+ * use the active membership states are reference states in their transactions. The notification flows may not serve our purposes
+ * because they only update the node's cache instead of storing the state in the vault and we need to research whether or not
+ * a StateAndRef<MembershipState<*>> can be used as a reference state even though it is not in our vault.
+ * The problem is that we are leaking to nodes which are not part of the BN..
+ * Option for future consideration to mitigate the leak:
+ * Only make all known members dbSvc.getAllMemberships(...) regardless status as observers.
+ * But future members may miss out existing members. Can we refresh our membership cache via GetMembershipsFlow inside
+ * our CorDapp flow and use a StateAndRef<MembershipState<*>> as reference state in our CorDapp flow
+ * even though it is not in our vault?
  *
  * @param membership membership state to be activated
  */
@@ -47,12 +57,12 @@ open class ActivateMembershipFlow(private val id: UUID?, val membership : StateA
         builder.verify(serviceHub)
         val selfSignedTx = serviceHub.signInitialTransaction(builder)
 
-        val memberSession = initiateFlow(membership.state.data.member)
-        val stx = if (memberSession.getCounterpartyFlowInfo().flowVersion == 1) {
-            subFlow(FinalityFlow(selfSignedTx))
-        } else {
-            subFlow(FinalityFlow(selfSignedTx, listOf(memberSession)))
+//        val allActiveMembers = getActiveMembershipsExceptForBNO().map { it.state.data.member }.toSet()  + membership.state.data.member
+        val allNodesExceptForBNO = serviceHub.networkMapCache.allNodes.map { it.legalIdentities.first() }.toSet() - ourIdentity - notary
+        val memberSessions = allNodesExceptForBNO.map {
+            initiateFlow(it)
         }
+      val stx = subFlow(FinalityFlow(selfSignedTx, memberSessions))
 
         // We should notify members about changes with the ACTIVATED membership
         val activatedMembership = databaseService.getMembership(membership.state.data.member, bn)!!
