@@ -23,7 +23,9 @@ import javax.persistence.Id
 import javax.persistence.Table
 
 class PendingMembershipRequestSchema
-class PendingMembershipRequestSchemaV1 internal constructor() : MappedSchema(PendingMembershipRequestSchema::class.java, 1, ImmutableList.of(PersistentPendingMembershipRequest::class.java))
+class PendingMembershipRequestSchemaV1 internal constructor() : MappedSchema(PendingMembershipRequestSchema::class.java, 1, ImmutableList.of(PersistentPendingMembershipRequest::class.java)) {
+    override val migrationResource = "pending_membership_request-schema.changelog-master"
+}
 
 @Entity(name = "PersistentPendingMembershipRequest")
 @Table(name = "pending_membership_requests")

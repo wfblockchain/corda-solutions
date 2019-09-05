@@ -10,7 +10,13 @@ import javax.persistence.Entity
 import javax.persistence.Table
 
 @CordaSerializable
-object MembershipStateSchemaV1 : MappedSchema(schemaFamily = MembershipState::class.java, version = 1, mappedTypes = listOf(PersistentMembershipState::class.java)) {
+object MembershipStateSchemaV1 : MappedSchema(
+        schemaFamily = MembershipState::class.java,
+        version = 1,
+        mappedTypes = listOf(PersistentMembershipState::class.java)
+) {
+    override val migrationResource = "membership-schema.changelog-master"
+
     @Entity
     @Table(name = "membership_states")
     class PersistentMembershipState (
