@@ -1,6 +1,6 @@
 --liquibase formatted sql
 
---changeset membership:init
+--changeset membership:init dbms:azure
 create table dbo.membership_states (
   output_index int not null,
   transaction_id nvarchar(64) not null,

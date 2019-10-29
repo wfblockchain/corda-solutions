@@ -17,7 +17,7 @@ cordapp {
         name "business-network-membership-service-states"
         vendor "com.r3"
         licence "http://www.apache.org/licenses/LICENSE-2.0"
-        versionId 1
+        versionId 3
     }
     signing {
         enabled true
